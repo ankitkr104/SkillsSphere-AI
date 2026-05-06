@@ -1,3 +1,6 @@
+import { weights } from "../config/weights.config.js";
+
+const roundToTwo = (value) => Number(value.toFixed(2));
 // --- Normalize text ---
 function normalize(text = "") {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
@@ -107,10 +110,10 @@ export function extractExperienceInYears(text = "") {
 export function experienceEvaluator({
   candidateExperienceText = "",
   jobDescription = "",
-  weight = 0.2,
-} = {}) {
-  const candidateYears = extractExperienceInYears(candidateExperienceText);
-  const requiredYears = extractExperienceInYears(jobDescription);
+  weight = weights.experience ?? 0.20,
+} = {}) => {
+  const candidateExperience = extractExperienceInYears(candidateExperienceText);
+  const requiredExperience = extractExperienceInYears(jobDescription);
 
   if (!requiredYears) {
     return {

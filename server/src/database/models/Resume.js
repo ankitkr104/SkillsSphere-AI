@@ -102,6 +102,11 @@ const resumeSchema = new mongoose.Schema(
       requiredExperience: Number,
       experienceGap: Number,
     },
+    semanticMatch: {
+      score: Number,
+      weight: Number,
+      feedback: [String],
+    },
     evaluatorBreakdown: {
       type: [mongoose.Schema.Types.Mixed],
       default: [],

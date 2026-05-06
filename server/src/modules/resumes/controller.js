@@ -3,6 +3,12 @@ import { parseResume } from "../../utils/parseResume.js";
 import Resume from "../../database/models/Resume.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import AppError from "../../utils/AppError.js";
+import {
+  experienceMatchEvaluator,
+  keywordMatchEvaluator,
+  skillMatchEvaluator,
+  semanticMatchEvaluator,
+} from "./evaluatorAdapters.js";
 import { runPipeline } from "../../../../ai-ml/pipeline/runPipeline.js";
 import {
   normalizeResumeData,
@@ -31,6 +37,17 @@ export const resetResumeControllerDependencies = () => {
 };
 
 
+
+const toLegacySemanticMatch = (pipelineResult) => {
+  const result = pipelineResult.breakdown.semanticMatch;
+  if (!result) return {};
+
+  return {
+    score: result.score,
+    weight: result.weight,
+    feedback: result.summary ? [result.summary] : [],
+  };
+};
 
 export const uploadResume = asyncHandler(async (req, res, next) => {
   if (!req.file) {
@@ -75,6 +92,15 @@ export const analyzeResume = async (req, res) => {
       jobDescription,
     });
 
+  const evaluators = [];
+  if (parsedData.skills?.length && jobSkills.length) {
+    evaluators.push(skillMatchEvaluator);
+  }
+  if (trimmedJobDescription && parsedData.resumeText) {
+    evaluators.push(keywordMatchEvaluator);
+    evaluators.push(semanticMatchEvaluator);
+  }
+  evaluators.push(experienceMatchEvaluator);
     // 🔥 Normalize everything
     const safeData = normalizeResumeData(parsedData);
     const safePipeline = normalizePipelineResult(pipelineResult);
@@ -121,11 +147,35 @@ export const analyzeResume = async (req, res) => {
   }
 };
 
+  const skillMatch = toLegacySkillMatch(pipelineResult);
+  const keywordMatch = toLegacyKeywordMatch(pipelineResult);
+  const experienceMatch = toLegacyExperienceMatch(pipelineResult);
+  const semanticMatch = toLegacySemanticMatch(pipelineResult);
 export const getResumeResult = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   const resume = await Resume.findById(id).select("-resumeText").lean();
 
 
+  const { resumeText, ...resumeFields } = parsedData;
+
+  const savedResume = await controllerDependencies.createResume({
+    ...resumeFields,
+    jobSkills,
+    jobDescription: trimmedJobDescription || null,
+    skillMatch,
+    keywordMatch,
+    experienceMatch,
+    semanticMatch,
+    evaluatorBreakdown: pipelineResult.evaluators,
+    aggregatedScore: pipelineResult.score,
+    file: fileData,
+  });
+
+  const successParts = [];
+  if (Object.keys(skillMatch).length > 0) successParts.push("skill match");
+  if (Object.keys(keywordMatch).length > 0) successParts.push("keyword relevance");
+  if (Object.keys(experienceMatch).length > 0) successParts.push("experience fit");
+  if (Object.keys(semanticMatch).length > 0) successParts.push("semantic alignment");
   if (!resume) {
     return next(new AppError("Resume not found", 404));
   }
@@ -137,8 +187,16 @@ export const getResumeResult = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: "Resume fetched successfully",
-    data: resume,
+    message: invalidJson ? "Resume parsed and saved, but jobSkills JSON format is invalid" : evalSummary,
+    resumeId: savedResume._id,
+    data: resumeFields,
+    skillMatch,
+    keywordMatch,
+    experienceMatch,
+    semanticMatch,
+    file: fileData,
+    evaluatorBreakdown: pipelineResult.evaluators,
+    overallScore: pipelineResult.score,
   });
 });
 

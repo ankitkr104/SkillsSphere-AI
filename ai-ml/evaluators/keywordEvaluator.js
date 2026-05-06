@@ -1,3 +1,5 @@
+import { weights } from "../config/weights.config.js";
+
 import techKeywords from "../config/keywords.js";
 import { normalizeSkill, normalizeSkillArray } from "../utils/skillNormalizer.js";
 
@@ -72,13 +74,14 @@ export const keywordEvaluator = ({
   // Normalize the search list to ensure synonyms match
   const keywordsToSearch = normalizeSkillArray(rawKeywordsToSearch);
 
-  // If no keywords found, use a baseline set
-  if (keywordsToSearch.length === 0) {
-    keywordsToSearch.push(...normalizeSkillArray([
-      "react", "nodejs", "javascript", "python", "aws", "docker", "sql", "api", "git", "typescript",
-      "java", "c++", "go", "django", "flask", "spring", "mongodb", "mysql", "postgresql", "redis",
-      "azure", "gcp", "kubernetes", "terraform", "ci/cd", "kafka", "rabbitmq", "agile", "scrum"
-    ]));
+  if (jdKeywords.length === 0) {
+    return {
+      score: 0,
+      weight: weights.keyword ?? 0.10,
+      feedback: ["No extractable keywords found in the job description"],
+      matchedKeywords: [],
+      missingKeywords: [],
+    };
   }
 
   const matchedKeywords = [];
@@ -117,7 +120,7 @@ export const keywordEvaluator = ({
 
   return {
     score,
-    weight,
+    weight: weights.keyword ?? 0.10,
     feedback,
     matchedKeywords: matchedKeywords.slice(0, 15),
     missingKeywords: missingKeywords.slice(0, 15),
