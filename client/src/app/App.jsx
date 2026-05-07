@@ -14,11 +14,13 @@ import OAuthCallback from "../modules/auth/OAuthCallback";
 import ResetPassword from "../modules/auth/ResetPassword";
 import VerifyEmail from "../modules/auth/VerifyEmail";
 import ProfilePage from "../modules/profile/ProfilePage";
+import VerifyEmail from "../modules/auth/VerifyEmail";
+import ProfilePage from "../modules/profile/ProfilePage";
 import RecruiterJobsPage from "../modules/recruiter-jobs/pages/RecruiterJobsPage";
 import CreateJobPostingPage from "../modules/recruiter-jobs/pages/CreateJobPostingPage";
 import JobBoardPage from "../modules/student-jobs/pages/JobBoardPage";
 import ProtectedRoute from "../shared/components/ProtectedRoute";
-
+import ThemeToggle from "../shared/components/ThemeToggle";
 function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
@@ -30,8 +32,9 @@ function App() {
   }, [dispatch, token]);
 
   return (
-    <div className="bg-white text-black dark:bg-dark-bg dark:text-text-main min-h-screen transition-colors duration-300">
-     <Routes>
+    <div className="min-h-screen bg-white text-black dark:bg-dark-bg dark:text-text-main transition-colors duration-300">
+      
+      <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route 
           path="/job-matcher" 

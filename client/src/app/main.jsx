@@ -6,7 +6,8 @@ import store from '../store/index';
 import App from './App.jsx';
 import './index.css';
 import { ToastProvider } from '../shared/components';
-const savedTheme = localStorage.getItem("skillssphere.theme");
+const savedTheme =
+  localStorage.getItem("skillssphere.theme") || "dark";
 
 if (savedTheme === "dark") {
   document.documentElement.classList.add("dark");
