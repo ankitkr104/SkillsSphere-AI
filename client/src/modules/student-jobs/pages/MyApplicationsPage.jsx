@@ -8,10 +8,16 @@ import {
   ExternalLink,
   Clock,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  XCircle,
 } from "lucide-react";
 import Navbar from "../../../shared/landing/Navbar";
 import LoadingState from "../../../shared/components/LoadingState";
-import { getMyApplicationsDetailed } from "../services/jobService";
+import {
+  getMyApplicationsDetailed,
+  withdrawApplication,
+} from "../services/jobService";
 
 const statusConfig = {
   pending: { label: "Pending", bg: "bg-yellow-500/15", text: "text-yellow-300", border: "border-yellow-500/25" },
@@ -21,29 +27,70 @@ const statusConfig = {
   withdrawn: { label: "Withdrawn", bg: "bg-slate-500/15", text: "text-slate-400", border: "border-slate-500/25" },
 };
 
+const ITEMS_PER_PAGE = 3;
+
 const MyApplicationsPage = () => {
   const { token } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [withdrawingId, setWithdrawingId] = useState(null);
+
+  const fetchApplications = async (page = 1) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getMyApplicationsDetailed(token, page, ITEMS_PER_PAGE);
+      setApplications(data.applications || []);
+      setCurrentPage(data.currentPage || 1);
+      setTotalPages(data.totalPages || 1);
+      setTotalCount(data.totalCount || 0);
+    } catch (err) {
+      setError(err.message || "Failed to load applications.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchApplications = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getMyApplicationsDetailed(token);
-        setApplications(data.applications || []);
-      } catch (err) {
-        setError(err.message || "Failed to load applications.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchApplications();
+    fetchApplications(currentPage);
   }, [token]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      fetchApplications(newPage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleWithdraw = async (jobId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to withdraw this application? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    setWithdrawingId(jobId);
+    try {
+      await withdrawApplication(jobId, token);
+      // Update the local state to reflect withdrawal
+      setApplications((prev) =>
+        prev.map((app) =>
+          (app.job?._id || app.job) === jobId
+            ? { ...app, status: "withdrawn" }
+            : app
+        )
+      );
+    } catch (err) {
+      alert(err.message || "Failed to withdraw application.");
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
 
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -52,6 +99,8 @@ const MyApplicationsPage = () => {
       year: "numeric",
     });
   };
+
+  const canWithdraw = (status) => ["pending", "reviewed"].includes(status);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#0f172a,#020617)] text-slate-100 flex flex-col">
@@ -81,13 +130,13 @@ const MyApplicationsPage = () => {
             <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
             <p className="text-red-300 font-medium mb-6">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => fetchApplications(currentPage)}
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-colors"
             >
               Try Again
             </button>
           </div>
-        ) : applications.length === 0 ? (
+        ) : applications.length === 0 && currentPage === 1 ? (
           /* Empty state */
           <div className="text-center p-12 bg-slate-900/50 rounded-2xl border border-white/5">
             <div className="inline-flex p-4 bg-slate-700/30 rounded-2xl mb-6">
@@ -110,12 +159,13 @@ const MyApplicationsPage = () => {
           /* Applications list */
           <div className="space-y-4">
             <p className="text-sm text-slate-500 mb-2">
-              {applications.length} application{applications.length !== 1 ? "s" : ""}
+              {totalCount} application{totalCount !== 1 ? "s" : ""}
             </p>
 
             {applications.map((app) => {
               const job = app.job;
               const status = statusConfig[app.status] || statusConfig.pending;
+              const jobId = job?._id || job;
 
               return (
                 <div
@@ -164,7 +214,7 @@ const MyApplicationsPage = () => {
                       )}
                     </div>
 
-                    {/* Status + Date */}
+                    {/* Status + Date + Withdraw */}
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <span
                         className={`px-3 py-1 text-xs font-bold rounded-full ${status.bg} ${status.text} border ${status.border}`}
@@ -175,6 +225,18 @@ const MyApplicationsPage = () => {
                         <Calendar size={12} />
                         {formatDate(app.createdAt)}
                       </span>
+
+                      {/* Withdraw button */}
+                      {canWithdraw(app.status) && (
+                        <button
+                          onClick={() => handleWithdraw(jobId)}
+                          disabled={withdrawingId === jobId}
+                          className="mt-1 flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <XCircle size={12} />
+                          {withdrawingId === jobId ? "Withdrawing..." : "Withdraw"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -201,6 +263,33 @@ const MyApplicationsPage = () => {
                 </div>
               );
             })}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 pt-6">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800/50 border border-white/10 rounded-xl hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={16} />
+                  Previous
+                </button>
+
+                <span className="text-sm text-slate-400">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800/50 border border-white/10 rounded-xl hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
