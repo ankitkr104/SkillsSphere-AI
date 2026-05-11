@@ -1,5 +1,6 @@
 import express from "express";
 import { protect, authorizeRoles } from "../../middleware/authMiddleware.js";
+import { jobCreationLimiter } from "../../middleware/rateLimiter.js";
 import {
   createJobPosting,
   getRecruiterJobs,
@@ -28,7 +29,7 @@ router.get("/recommendations", getRecommendations);
 // Recruiter-only routes
 router.get("/recruiter", authorizeRoles("recruiter"), getRecruiterJobs);
 router.get("/recruiter/analytics", authorizeRoles("recruiter"), getRecruiterAnalytics);
-router.post("/", authorizeRoles("recruiter"), createJobPosting);
+router.post("/", authorizeRoles("recruiter"), jobCreationLimiter, createJobPosting);
 
 // Student application routes (must be before /:id to avoid route conflict)
 router.get("/my-applications", authorizeRoles("student"), getMyApplications);
